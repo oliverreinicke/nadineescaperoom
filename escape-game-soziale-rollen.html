@@ -1,0 +1,1864 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escape Room: Soziale Rollen</title>
+  <style>
+    :root {
+      --sky: linear-gradient(180deg, #f8f2e6 0%, #ccb187 100%);
+      --wall-top: #f7f0e5;
+      --wall-bottom: #d9c6ab;
+      --side-wall: #dcc4a0;
+      --floor-a: #bb895d;
+      --floor-b: #986843;
+      --board: #284437;
+      --board-text: #eef8eb;
+      --desk: #7b4c2d;
+      --desk-top: #9a6841;
+      --door: #9a6037;
+      --door-dark: #734425;
+      --accent: #c8572e;
+      --accent-dark: #8f3114;
+      --ink: #1f2328;
+      --soft-ink: #56606a;
+      --panel: rgba(255, 251, 244, 0.92);
+      --gold: #dba946;
+      --good: #2e8c59;
+      --bad: #b03f31;
+      --player-shirt: #3070d1;
+      --player-pants: #26354f;
+      --spot-glow: rgba(255, 212, 93, 0.28);
+      --window: #a7d4f7;
+      --window-frame: #efdfc7;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Trebuchet MS", "Avenir Next", Arial, sans-serif;
+      background: #d9c6ab;
+      color: var(--ink);
+    }
+
+    body {
+      background: var(--sky);
+    }
+
+    .app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.66), transparent 24%),
+        var(--sky);
+      transition: background 700ms ease;
+    }
+
+    .hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      z-index: 40;
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      pointer-events: none;
+    }
+
+    .hud-card {
+      pointer-events: auto;
+      background: var(--panel);
+      border: 1px solid rgba(102, 72, 41, 0.12);
+      border-radius: 18px;
+      padding: 14px 16px;
+      box-shadow: 0 16px 28px rgba(23, 25, 28, 0.12);
+      backdrop-filter: blur(10px);
+    }
+
+    .hud-card h1 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+    }
+
+    .hud-card p {
+      margin: 0;
+      color: var(--soft-ink);
+      font-size: 0.95rem;
+    }
+
+    .hud-left {
+      max-width: min(500px, 68vw);
+    }
+
+    .hud-right {
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      min-width: 210px;
+    }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+    }
+
+    .badge {
+      min-width: 48px;
+      height: 42px;
+      padding: 0 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #f4c25b, var(--gold));
+      color: #4c2b0c;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    }
+
+    .progress {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .progress-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: rgba(90, 70, 44, 0.16);
+      border: 1px solid rgba(90, 70, 44, 0.14);
+    }
+
+    .progress-dot.done {
+      background: linear-gradient(135deg, #f0c86c, #d28f16);
+    }
+
+    .room-wrapper {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      perspective: 1500px;
+      padding: 118px 18px 28px;
+    }
+
+    .room {
+      position: relative;
+      width: min(1220px, 100%);
+      height: min(770px, calc(100vh - 152px));
+      transform-style: preserve-3d;
+      transform: rotateX(8deg) rotateY(var(--tilt, -4deg));
+      transition: transform 320ms ease, opacity 380ms ease, filter 380ms ease;
+    }
+
+    .room.traveling {
+      opacity: 0.2;
+      filter: blur(6px) saturate(0.8);
+      transform: rotateX(8deg) rotateY(-2deg) scale(1.05);
+    }
+
+    .ceiling,
+    .floor,
+    .wall-back,
+    .wall-left,
+    .wall-right {
+      position: absolute;
+      border: 1px solid rgba(90, 60, 34, 0.08);
+      transform-style: preserve-3d;
+    }
+
+    .wall-back {
+      inset: 7% 6% 20% 6%;
+      background:
+        linear-gradient(180deg, var(--wall-top) 0%, var(--wall-bottom) 100%);
+      box-shadow: inset 0 -80px 140px rgba(100, 74, 38, 0.14);
+    }
+
+    .wall-left,
+    .wall-right {
+      top: 10%;
+      bottom: 22%;
+      width: 18%;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--side-wall) 88%, white) 0%, var(--side-wall) 100%);
+      opacity: 0.95;
+    }
+
+    .wall-left {
+      left: 1%;
+      transform: rotateY(67deg) translateZ(-116px);
+      transform-origin: left center;
+    }
+
+    .wall-right {
+      right: 1%;
+      transform: rotateY(-67deg) translateZ(-116px);
+      transform-origin: right center;
+    }
+
+    .ceiling {
+      top: 2%;
+      left: 8%;
+      right: 8%;
+      height: 18%;
+      background: linear-gradient(180deg, #fffaf0 0%, #e9dac2 100%);
+      transform: rotateX(82deg) translateZ(145px);
+      transform-origin: top center;
+      opacity: 0.75;
+    }
+
+    .floor {
+      left: 3%;
+      right: 3%;
+      bottom: 2%;
+      height: 43%;
+      background:
+        repeating-linear-gradient(90deg, var(--floor-a) 0 40px, var(--floor-b) 40px 80px);
+      transform: rotateX(82deg) translateZ(-144px);
+      transform-origin: bottom center;
+      box-shadow: 0 -24px 44px rgba(26, 18, 10, 0.18);
+    }
+
+    .window {
+      position: absolute;
+      top: 16%;
+      right: 9%;
+      width: 16%;
+      height: 24%;
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,255,255,0.15));
+      box-shadow: 0 14px 30px rgba(24, 30, 45, 0.12);
+      border: 10px solid var(--window-frame);
+      overflow: hidden;
+    }
+
+    .window::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--window) 75%, white) 0%, var(--window) 100%);
+    }
+
+    .window::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, transparent 46%, rgba(255,255,255,0.75) 46%, rgba(255,255,255,0.75) 54%, transparent 54%),
+        linear-gradient(180deg, transparent 46%, rgba(255,255,255,0.75) 46%, rgba(255,255,255,0.75) 54%, transparent 54%);
+    }
+
+    .board,
+    .desk,
+    .door,
+    .poster {
+      position: absolute;
+      transform-style: preserve-3d;
+      transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+      user-select: none;
+    }
+
+    .board,
+    .desk,
+    .door {
+      cursor: pointer;
+    }
+
+    .board:hover,
+    .desk:hover,
+    .door:hover {
+      transform: translateY(-4px);
+      filter: saturate(1.05);
+    }
+
+    .board {
+      top: 16%;
+      left: 9%;
+      width: 40%;
+      height: 32%;
+      padding: 18px;
+      border: 14px solid #97663c;
+      border-radius: 10px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--board) 90%, white) 0%, var(--board) 100%);
+      color: var(--board-text);
+      box-shadow: 0 18px 34px rgba(18, 22, 24, 0.16);
+    }
+
+    .board h3 {
+      margin: 0 0 8px;
+      font-size: 1.35rem;
+    }
+
+    .board p {
+      margin: 0;
+      max-width: 82%;
+      color: color-mix(in srgb, var(--board-text) 82%, transparent);
+    }
+
+    .board::after {
+      content: "Situation lesen";
+      position: absolute;
+      left: 16px;
+      bottom: 14px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.96);
+      font-size: 0.88rem;
+      letter-spacing: 0.03em;
+    }
+
+    .poster {
+      top: 20%;
+      right: 30%;
+      width: 12%;
+      height: 22%;
+      padding: 14px;
+      border: 10px solid #8c5b33;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #faf4e9 0%, #eadbc6 100%);
+      color: #684426;
+      box-shadow: 0 12px 28px rgba(38, 25, 14, 0.12);
+      font-size: 0.9rem;
+    }
+
+    .poster strong {
+      display: block;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+    }
+
+    .desk {
+      left: 31%;
+      bottom: 19%;
+      width: 29%;
+      height: 18%;
+      border: 0;
+      border-radius: 10px;
+      background: linear-gradient(180deg, var(--desk-top) 0%, var(--desk) 100%);
+      box-shadow: 0 26px 34px rgba(48, 30, 13, 0.24), inset 0 2px 0 rgba(255,255,255,0.15);
+    }
+
+    .desk::before,
+    .desk::after {
+      content: "";
+      position: absolute;
+      bottom: -30px;
+      width: 16px;
+      height: 34px;
+      background: #5c351d;
+      border-radius: 0 0 6px 6px;
+    }
+
+    .desk::before {
+      left: 18px;
+    }
+
+    .desk::after {
+      right: 18px;
+    }
+
+    .desk-label {
+      position: absolute;
+      left: 50%;
+      top: 18px;
+      transform: translateX(-50%);
+      color: #fff4df;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .desk-label span {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.82rem;
+      color: rgba(255,244,223,0.84);
+      font-weight: 500;
+    }
+
+    .door-zone {
+      position: absolute;
+      right: 11%;
+      bottom: 15%;
+      width: 19%;
+      height: 50%;
+    }
+
+    .door-frame {
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #83542f 0%, #5e371f 100%);
+      box-shadow: 0 18px 32px rgba(46, 27, 12, 0.18);
+    }
+
+    .door {
+      position: absolute;
+      inset: 4% 8% 2% 8%;
+      border: 0;
+      border-radius: 9px;
+      background: linear-gradient(180deg, var(--door) 0%, var(--door-dark) 100%);
+      box-shadow: inset -12px 0 0 rgba(42, 20, 8, 0.12);
+      transform-origin: left center;
+      overflow: hidden;
+    }
+
+    .door::before {
+      content: "";
+      position: absolute;
+      top: 46%;
+      right: 14%;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #f1d389 0%, #bc8820 100%);
+    }
+
+    .door::after {
+      content: "Zur Tuer";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 18px;
+      text-align: center;
+      color: #fff2df;
+      font-weight: 700;
+      text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+    }
+
+    .door.locked::after {
+      content: "Verschlossen";
+    }
+
+    .door.unlocked {
+      animation: open-door 980ms ease forwards;
+    }
+
+    @keyframes open-door {
+      from { transform: rotateY(0deg); }
+      to { transform: rotateY(-78deg); }
+    }
+
+    .glow {
+      position: absolute;
+      width: 120px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--spot-glow);
+      filter: blur(12px);
+      opacity: 0.75;
+      pointer-events: none;
+      transition: left 700ms ease;
+    }
+
+    .glow.board {
+      left: 19%;
+      bottom: 16%;
+    }
+
+    .glow.desk {
+      left: 43%;
+      bottom: 12%;
+    }
+
+    .glow.door {
+      left: 76%;
+      bottom: 14%;
+    }
+
+    .player {
+      position: absolute;
+      left: var(--player-x, 42%);
+      bottom: 13%;
+      width: 74px;
+      height: 150px;
+      transform: translateX(-50%);
+      transition: left 900ms cubic-bezier(.35,.08,.2,1), transform 300ms ease, opacity 420ms ease;
+      z-index: 8;
+      pointer-events: none;
+    }
+
+    .player.walking {
+      animation: bounce 260ms ease-in-out infinite alternate;
+    }
+
+    .player.entering-door {
+      opacity: 0.05;
+      transform: translateX(-50%) scale(0.7);
+    }
+
+    @keyframes bounce {
+      from { transform: translateX(-50%) translateY(0); }
+      to { transform: translateX(-50%) translateY(-5px); }
+    }
+
+    .player-shadow {
+      position: absolute;
+      left: 50%;
+      bottom: -4px;
+      width: 58px;
+      height: 16px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: rgba(25, 18, 11, 0.24);
+      filter: blur(6px);
+    }
+
+    .player-head {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      width: 34px;
+      height: 34px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: #efc09a;
+      box-shadow: inset 0 -4px 0 rgba(0,0,0,0.08);
+    }
+
+    .player-hair {
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      width: 40px;
+      height: 18px;
+      transform: translateX(-50%);
+      border-radius: 18px 18px 8px 8px;
+      background: #51351f;
+    }
+
+    .player-body {
+      position: absolute;
+      top: 38px;
+      left: 50%;
+      width: 40px;
+      height: 50px;
+      transform: translateX(-50%);
+      border-radius: 12px;
+      background: var(--player-shirt);
+    }
+
+    .player-arm {
+      position: absolute;
+      top: 44px;
+      width: 12px;
+      height: 42px;
+      border-radius: 10px;
+      background: #efc09a;
+    }
+
+    .player-arm.left {
+      left: 12px;
+      transform: rotate(14deg);
+    }
+
+    .player-arm.right {
+      right: 12px;
+      transform: rotate(-14deg);
+    }
+
+    .player-leg {
+      position: absolute;
+      top: 82px;
+      width: 14px;
+      height: 52px;
+      border-radius: 10px;
+      background: var(--player-pants);
+    }
+
+    .player-leg.left {
+      left: 23px;
+    }
+
+    .player-leg.right {
+      right: 23px;
+    }
+
+    .player-shoe {
+      position: absolute;
+      bottom: 8px;
+      width: 18px;
+      height: 8px;
+      border-radius: 8px;
+      background: #3b2414;
+    }
+
+    .player-shoe.left {
+      left: 20px;
+    }
+
+    .player-shoe.right {
+      right: 20px;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 60;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(24, 18, 12, 0.54);
+      padding: 18px;
+    }
+
+    .overlay.show {
+      display: flex;
+    }
+
+    .panel {
+      width: min(820px, 100%);
+      max-height: 88vh;
+      overflow: auto;
+      background: var(--panel);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 32px 55px rgba(0,0,0,0.24);
+      border: 1px solid rgba(112, 78, 42, 0.14);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+
+    .panel h2 {
+      margin: 0 0 6px;
+      line-height: 1.15;
+    }
+
+    .legend {
+      margin: 0;
+      color: var(--soft-ink);
+    }
+
+    .close-btn {
+      width: 40px;
+      height: 40px;
+      border: 0;
+      border-radius: 50%;
+      background: #efe0ce;
+      color: #654022;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    .box {
+      margin-top: 14px;
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.74);
+      border: 1px solid rgba(122, 87, 46, 0.12);
+    }
+
+    .box p {
+      margin: 0;
+      color: var(--soft-ink);
+    }
+
+    .box p + p {
+      margin-top: 10px;
+    }
+
+    .question-group + .question-group {
+      margin-top: 18px;
+    }
+
+    .option-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .option {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(252,247,240,0.86);
+      border: 1px solid rgba(125, 86, 43, 0.12);
+    }
+
+    .option input,
+    .option select {
+      margin-top: 3px;
+      accent-color: var(--accent);
+    }
+
+    .statement-grid {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .statement-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(252,247,240,0.86);
+      border: 1px solid rgba(125, 86, 43, 0.12);
+    }
+
+    .statement-row label {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      white-space: nowrap;
+    }
+
+    .fill-input,
+    .select-input {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(125, 86, 43, 0.22);
+      background: rgba(255,255,255,0.9);
+      font: inherit;
+      color: var(--ink);
+    }
+
+    .match-grid {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .match-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 230px;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(252,247,240,0.86);
+      border: 1px solid rgba(125, 86, 43, 0.12);
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .primary,
+    .secondary {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-size: 0.98rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 120ms ease, filter 120ms ease;
+    }
+
+    .primary:hover,
+    .secondary:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.02);
+    }
+
+    .primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      color: white;
+    }
+
+    .secondary {
+      background: #efe2d3;
+      color: #5d3620;
+    }
+
+    .feedback {
+      display: none;
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.82);
+      border-left: 6px solid var(--bad);
+    }
+
+    .feedback.show {
+      display: block;
+    }
+
+    .feedback.good {
+      border-left-color: var(--good);
+    }
+
+    .travel-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 55;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, rgba(17,14,12,0.84) 72%);
+      color: white;
+      text-align: center;
+      padding: 18px;
+    }
+
+    .travel-overlay.show {
+      display: flex;
+    }
+
+    .travel-box {
+      padding: 22px 28px;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+    }
+
+    .travel-box h2,
+    .travel-box p {
+      margin: 0;
+    }
+
+    .travel-box p {
+      margin-top: 8px;
+      color: rgba(255,255,255,0.82);
+    }
+
+    .win-screen {
+      text-align: center;
+    }
+
+    .win-code {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 12px 20px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #f4c35d, #d49828);
+      color: #4c2b0c;
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+    }
+
+    .shake {
+      animation: shake 500ms ease;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-7px); }
+      40% { transform: translateX(6px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+
+    @media (max-width: 900px) {
+      .desk {
+        left: 27%;
+        width: 34%;
+      }
+
+      .door-zone {
+        right: 7%;
+        width: 24%;
+      }
+
+      .poster {
+        right: 24%;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .hud {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        flex-direction: column;
+      }
+
+      .hud-left {
+        max-width: none;
+      }
+
+      .room-wrapper {
+        padding-top: 156px;
+      }
+
+      .room {
+        height: min(680px, calc(100vh - 182px));
+        transform: rotateX(6deg) rotateY(-2deg);
+      }
+
+      .board {
+        left: 7%;
+        width: 54%;
+      }
+
+      .poster,
+      .window {
+        display: none;
+      }
+
+      .desk {
+        left: 20%;
+        width: 42%;
+      }
+
+      .door-zone {
+        right: 6%;
+        width: 27%;
+      }
+
+      .match-row,
+      .statement-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="hud">
+      <div class="hud-card hud-left">
+        <h1 id="stage-title">Escape Room: Soziale Rollen</h1>
+        <p id="stage-subtitle">Lies zuerst die Situation an der Tafel. Geh dann mit deiner Figur zum Fragepult. Nur mit der richtigen Antwort oeffnet sich die Tuer.</p>
+        <div class="progress" id="progress"></div>
+      </div>
+      <div class="hud-card hud-right">
+        <div class="status-line">
+          <span class="badge" id="room-badge">1 / 7</span>
+          <span id="status-text">Schloss 1 wartet auf dich.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="room-wrapper">
+      <div class="room" id="room">
+        <div class="ceiling"></div>
+        <div class="wall-back"></div>
+        <div class="wall-left"></div>
+        <div class="wall-right"></div>
+        <div class="floor"></div>
+        <div class="window"></div>
+
+        <div class="glow board"></div>
+        <div class="glow desk"></div>
+        <div class="glow door"></div>
+
+        <button class="board" id="board-button" aria-label="Situation lesen">
+          <h3 id="board-headline">Tafel</h3>
+          <p id="board-preview">Klicke hier, um die Situation zu lesen.</p>
+        </button>
+
+        <div class="poster" id="poster">
+          <strong id="poster-title">Hinweis</strong>
+          <span id="poster-text">Lies. Denk nach. Handle dann.</span>
+        </div>
+
+        <button class="desk" id="desk-button" aria-label="Fragepult">
+          <div class="desk-label">
+            Fragepult
+            <span id="desk-subtitle">Erst nach der Tafel aktiv</span>
+          </div>
+        </button>
+
+        <div class="door-zone">
+          <div class="door-frame"></div>
+          <button class="door locked" id="door-button" aria-label="Zur Tuer"></button>
+        </div>
+
+        <div class="player" id="player">
+          <div class="player-shadow"></div>
+          <div class="player-hair"></div>
+          <div class="player-head"></div>
+          <div class="player-arm left"></div>
+          <div class="player-arm right"></div>
+          <div class="player-body"></div>
+          <div class="player-leg left"></div>
+          <div class="player-leg right"></div>
+          <div class="player-shoe left"></div>
+          <div class="player-shoe right"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay show" id="start-overlay">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Flucht aus dem Klassenchaos</h2>
+            <p class="legend">Ein interaktiver Escape Room zur Vorbereitung auf den Leistungsnachweis. Jede Tuer fuehrt in einen neuen Raum mit eigener Stimmung und neuer Denkaufgabe.</p>
+          </div>
+        </div>
+        <div class="box">
+          <p><strong>So spielst du:</strong></p>
+          <p>1. Klicke die Tafel an. Deine Spielfigur laeuft dorthin.</p>
+          <p>2. Lies die Situation aufmerksam.</p>
+          <p>3. Geh zum Fragepult und loese die Aufgabe.</p>
+          <p>4. Erst dann entriegelt sich die Tuer zum naechsten Raum.</p>
+        </div>
+        <div class="button-row">
+          <button class="primary" id="start-button">Spiel starten</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="scene-overlay">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 id="scene-title">Situation</h2>
+            <p class="legend" id="scene-legend">Lies aufmerksam. Danach wartet die Aufgabe am Pult.</p>
+          </div>
+          <button class="close-btn" id="scene-close" aria-label="Schliessen">×</button>
+        </div>
+        <div class="box" id="scene-box"></div>
+        <div class="button-row">
+          <button class="primary" id="scene-done">Verstanden</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="quiz-overlay">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 id="quiz-title">Fragepult</h2>
+            <p class="legend" id="quiz-legend">Loese die Aufgabe. Dann geht die Tuer auf.</p>
+          </div>
+          <button class="close-btn" id="quiz-close" aria-label="Schliessen">×</button>
+        </div>
+        <form id="quiz-form"></form>
+        <div class="feedback" id="feedback">
+          <p id="feedback-text"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="travel-overlay" id="travel-overlay">
+      <div class="travel-box">
+        <h2 id="travel-title">Du gehst durch die Tuer ...</h2>
+        <p id="travel-text">Der naechste Raum entsteht.</p>
+      </div>
+    </div>
+
+    <div class="overlay" id="win-overlay">
+      <div class="panel win-screen">
+        <h2>Du bist entkommen</h2>
+        <p class="legend">Alle 7 Raeume sind geschafft. Du hast Rollen erkannt, Situationen beurteilt und Vorurteile durchschaut.</p>
+        <div class="win-code">2746137</div>
+        <div class="button-row" style="justify-content:center;">
+          <button class="primary" id="restart-button">Noch einmal spielen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const stages = [
+      {
+        title: "Schloss 1: Die Eingangshalle",
+        subtitle: "Hier beginnt alles mit der Grundfrage: Was ist eine soziale Rolle?",
+        theme: {
+          sky: "linear-gradient(180deg, #f8f2e6 0%, #ceb28b 100%)",
+          wallTop: "#f7f1e5",
+          wallBottom: "#ddcab0",
+          sideWall: "#dcc39b",
+          floorA: "#bb8a60",
+          floorB: "#996a45",
+          board: "#284437",
+          boardText: "#eef8eb",
+          desk: "#76482c",
+          deskTop: "#9c6a43",
+          door: "#9a6037",
+          doorDark: "#744526",
+          accent: "#c85a2c",
+          accentDark: "#913316",
+          playerShirt: "#3173d2",
+          playerPants: "#26364e",
+          spotGlow: "rgba(255, 211, 106, 0.28)",
+          window: "#abd6f4",
+          windowFrame: "#f1ddc2"
+        },
+        posterTitle: "Start",
+        posterText: "Jede Flucht beginnt mit einem klaren Begriff.",
+        boardHeadline: "Tafel 1",
+        boardPreview: "Was bedeutet soziale Rolle ueberhaupt?",
+        sceneTitle: "Die erste Tafel",
+        sceneBody: [
+          "Menschen haben in Gruppen oft bestimmte Rollen. In der Schule kann jemand fuehren, widersprechen, still mitlaufen oder eher am Rand stehen.",
+          "Eine soziale Rolle beschreibt nicht das Aussehen einer Person, sondern Erwartungen und typisches Verhalten in einer bestimmten Situation."
+        ],
+        questionLegend: "Mehrfachwahl: Nur eine Antwort passt wirklich gut.",
+        questions: [
+          {
+            type: "single",
+            id: "role-def",
+            prompt: "Welche Erklaerung passt am besten zu einer sozialen Rolle?",
+            options: [
+              { value: "a", label: "Das Aussehen einer Person in der Klasse." },
+              { value: "b", label: "Typisches Verhalten und Erwartungen an eine Person in einer Gruppe." },
+              { value: "c", label: "Der Lieblingsplatz einer Person im Schulzimmer." }
+            ]
+          }
+        ],
+        validate(answers) {
+          return answers["role-def"] === "b";
+        },
+        success: "Stark. Du hast den Grundbegriff geknackt."
+      },
+      {
+        title: "Schloss 2: Das Experiment-Labor",
+        subtitle: "Dieser Raum fragt nach dem Stanford Prison Experiment.",
+        theme: {
+          sky: "linear-gradient(180deg, #e7f3fb 0%, #9bc2d9 100%)",
+          wallTop: "#edf7fc",
+          wallBottom: "#c9dce6",
+          sideWall: "#b7d3df",
+          floorA: "#8ca6b8",
+          floorB: "#6e8496",
+          board: "#1f3a4c",
+          boardText: "#eef8fd",
+          desk: "#4e6474",
+          deskTop: "#6f8b9d",
+          door: "#5e7f95",
+          doorDark: "#3a576d",
+          accent: "#0d7eac",
+          accentDark: "#07506f",
+          playerShirt: "#00a1c8",
+          playerPants: "#26445f",
+          spotGlow: "rgba(118, 215, 255, 0.28)",
+          window: "#b7e4ff",
+          windowFrame: "#dceef8"
+        },
+        posterTitle: "Labor",
+        posterText: "Rollen veraendern oft Verhalten.",
+        boardHeadline: "Tafel 2",
+        boardPreview: "Was zeigt das Stanford Prison Experiment?",
+        sceneTitle: "Die zweite Tafel",
+        sceneBody: [
+          "Beim Stanford Prison Experiment bekamen einige Teilnehmer die Rolle von Gefangenen und andere die Rolle von Waertern.",
+          "Obwohl alles nur ein Experiment war, veraenderte sich das Verhalten vieler Menschen schnell. Das zeigt, dass Rollen und Macht Verhalten stark beeinflussen koennen."
+        ],
+        questionLegend: "Wahr oder falsch? Beurteile jede Aussage einzeln.",
+        questions: [
+          {
+            type: "truefalse",
+            id: "stanford-tf",
+            statements: [
+              { key: "s1", text: "Rollen koennen das Verhalten von Menschen beeinflussen." },
+              { key: "s2", text: "Menschen bleiben immer gleich, egal welche Rolle sie haben." },
+              { key: "s3", text: "Erwartungen in einer Rolle koennen Verhalten veraendern." }
+            ]
+          }
+        ],
+        validate(answers) {
+          const set = answers["stanford-tf"] || {};
+          return set.s1 === "true" && set.s2 === "false" && set.s3 === "true";
+        },
+        success: "Genau. Du hast die Kernaussage des Experiments erkannt."
+      },
+      {
+        title: "Schloss 3: Der Fuehrungsraum",
+        subtitle: "Hier liest du eine Szene und schreibst die passende Rolle selbst ein.",
+        theme: {
+          sky: "linear-gradient(180deg, #fff0d9 0%, #d3a069 100%)",
+          wallTop: "#fff5e7",
+          wallBottom: "#e3c59b",
+          sideWall: "#dcb987",
+          floorA: "#c38d57",
+          floorB: "#9a683d",
+          board: "#5a3720",
+          boardText: "#fff4de",
+          desk: "#6b3417",
+          deskTop: "#98502b",
+          door: "#aa6538",
+          doorDark: "#7f4322",
+          accent: "#de6c1e",
+          accentDark: "#a1470f",
+          playerShirt: "#f0772d",
+          playerPants: "#56372c",
+          spotGlow: "rgba(255, 173, 58, 0.3)",
+          window: "#ffe2b5",
+          windowFrame: "#efd6b1"
+        },
+        posterTitle: "Mut",
+        posterText: "Nicht jede starke Stimme ist automatisch schlecht.",
+        boardHeadline: "Tafel 3",
+        boardPreview: "Hier musst du die Rolle selbst finden.",
+        sceneTitle: "Die dritte Tafel",
+        sceneBody: [
+          "Mia bestimmt in der Gruppenarbeit oft, was gemacht wird. Sie verteilt Aufgaben, redet fuer die Gruppe und viele andere orientieren sich an ihr.",
+          "Manchmal hilft das der Klasse, weil jemand Verantwortung uebernimmt. Gleichzeitig nimmt Mia viel Raum ein."
+        ],
+        questionLegend: "Lueckentext: Schreibe die passende Rolle in das Feld.",
+        questions: [
+          {
+            type: "fill",
+            id: "leader-fill",
+            prompt: "Mia ist in dieser Situation am ehesten eine oder ein:",
+            placeholder: "Rolle eingeben"
+          }
+        ],
+        validate(answers) {
+          const text = normalize(answers["leader-fill"]);
+          return [
+            "anfuhrerin", "anfuhrer", "anfuehrerin", "anfuehrer",
+            "anfuhrer:in", "anfuehrer:in"
+          ].includes(text);
+        },
+        success: "Richtig. Hier passt die Rolle Anfuehrer:in."
+      },
+      {
+        title: "Schloss 4: Das Beobachtungsarchiv",
+        subtitle: "Jetzt sortierst du Merkmale zu passenden Rollen.",
+        theme: {
+          sky: "linear-gradient(180deg, #f3efe9 0%, #b6a89a 100%)",
+          wallTop: "#faf7f2",
+          wallBottom: "#d9d0c5",
+          sideWall: "#cfc1b4",
+          floorA: "#907a67",
+          floorB: "#6e5c4e",
+          board: "#384042",
+          boardText: "#f5f7f8",
+          desk: "#57483c",
+          deskTop: "#766353",
+          door: "#6a5648",
+          doorDark: "#4b3b31",
+          accent: "#9a5f3d",
+          accentDark: "#694126",
+          playerShirt: "#a06b45",
+          playerPants: "#38424d",
+          spotGlow: "rgba(220, 204, 171, 0.32)",
+          window: "#dfe7ee",
+          windowFrame: "#ede2d3"
+        },
+        posterTitle: "Archiv",
+        posterText: "Genaues Beobachten ist staerker als Bauchgefuehl.",
+        boardHeadline: "Tafel 4",
+        boardPreview: "Ordne Eigenschaften den richtigen Rollen zu.",
+        sceneTitle: "Die vierte Tafel",
+        sceneBody: [
+          "Unterschiedliche Rollen haben oft typische Merkmale. Wichtig ist aber: Ein Merkmal allein beweist noch keine Rolle.",
+          "Trotzdem kann man gute Zuordnungen treffen, wenn man genau hinschaut."
+        ],
+        questionLegend: "Zuordnen: Waehle fuer jede Beschreibung die passendste Rolle.",
+        questions: [
+          {
+            type: "match",
+            id: "match-roles",
+            rows: [
+              { key: "m1", prompt: "will oft einfach dazugehören" },
+              { key: "m2", prompt: "wird schnell beschuldigt" },
+              { key: "m3", prompt: "hinterfragt und diskutiert" }
+            ],
+            options: [
+              { value: "", label: "Bitte waehlen" },
+              { value: "follower", label: "Mitlaeufer:in" },
+              { value: "scapegoat", label: "Suendenbock" },
+              { value: "opponent", label: "Opponent:in" },
+              { value: "outsider", label: "Aussenseiter:in" }
+            ]
+          }
+        ],
+        validate(answers) {
+          const set = answers["match-roles"] || {};
+          return set.m1 === "follower" && set.m2 === "scapegoat" && set.m3 === "opponent";
+        },
+        success: "Sauber sortiert. Du erkennst die Unterschiede immer genauer."
+      },
+      {
+        title: "Schloss 5: Der Nebelgang",
+        subtitle: "Hier musst du zwei aehnliche Rollen auseinanderhalten.",
+        theme: {
+          sky: "linear-gradient(180deg, #eceef3 0%, #8d97ab 100%)",
+          wallTop: "#f5f7fa",
+          wallBottom: "#c9cfdb",
+          sideWall: "#bbc2d1",
+          floorA: "#7c8598",
+          floorB: "#606879",
+          board: "#2d3447",
+          boardText: "#eff3ff",
+          desk: "#454f64",
+          deskTop: "#64718a",
+          door: "#58667e",
+          doorDark: "#394456",
+          accent: "#6c7cb5",
+          accentDark: "#485381",
+          playerShirt: "#7d88c9",
+          playerPants: "#2d3552",
+          spotGlow: "rgba(174, 191, 255, 0.28)",
+          window: "#cad8ee",
+          windowFrame: "#e7edf7"
+        },
+        posterTitle: "Nebel",
+        posterText: "Verwechslungsgefahr: ruhig ist nicht gleich Mitlaeufer:in.",
+        boardHeadline: "Tafel 5",
+        boardPreview: "Eine genaue Unterscheidung ist jetzt entscheidend.",
+        sceneTitle: "Die fuenfte Tafel",
+        sceneBody: [
+          "Noah hat keine feste Gruppe, sitzt in Pausen oft allein und wird selten gefragt, ob er mitmachen moechte.",
+          "Er laeuft nicht einfach mit der Mehrheit mit, sondern steht eher am Rand."
+        ],
+        questionLegend: "A oder B? Triff die genauere Entscheidung.",
+        questions: [
+          {
+            type: "single",
+            id: "outsider-choice",
+            prompt: "Welche Rolle passt besser zu Noah?",
+            options: [
+              { value: "follower", label: "Mitlaeufer:in" },
+              { value: "outsider", label: "Aussenseiter:in" }
+            ]
+          }
+        ],
+        validate(answers) {
+          return answers["outsider-choice"] === "outsider";
+        },
+        success: "Genau. Hier geht es um Randposition, nicht ums Mitlaufen."
+      },
+      {
+        title: "Schloss 6: Der Tierkorridor",
+        subtitle: "Bekannte Tierbilder tauchen wieder auf, aber diesmal als Escape-Aufgabe.",
+        theme: {
+          sky: "linear-gradient(180deg, #fff4c7 0%, #c7a44a 100%)",
+          wallTop: "#fff8df",
+          wallBottom: "#ead48f",
+          sideWall: "#ddc16a",
+          floorA: "#b08d38",
+          floorB: "#8e6f28",
+          board: "#5a4a17",
+          boardText: "#fffbe7",
+          desk: "#745b18",
+          deskTop: "#9e7f26",
+          door: "#a57a18",
+          doorDark: "#79560f",
+          accent: "#db8a10",
+          accentDark: "#a96200",
+          playerShirt: "#d69a16",
+          playerPants: "#58451b",
+          spotGlow: "rgba(255, 223, 115, 0.34)",
+          window: "#fff0a4",
+          windowFrame: "#f2df98"
+        },
+        posterTitle: "Tierbilder",
+        posterText: "Bilder helfen, koennen aber auch unfair vereinfachen.",
+        boardHeadline: "Tafel 6",
+        boardPreview: "Welche Standard-Zuordnung passt hier am besten?",
+        sceneTitle: "Die sechste Tafel",
+        sceneBody: [
+          "Eine Person wird in der Klasse schnell beschuldigt, wenn etwas schiefgeht. Viele denken sofort an sie, auch wenn das unfair ist.",
+          "In 'tierisch was los' wurden Tieren oft bestimmte Eigenschaften oder Bilder zugeordnet."
+        ],
+        questionLegend: "Wahr oder falsch? Hier pruefst du zwei Aussagen und waehlst dann das Tierbild.",
+        questions: [
+          {
+            type: "truefalse",
+            id: "animal-tf",
+            statements: [
+              { key: "a1", text: "Die beschriebene Person wird gerecht beurteilt." },
+              { key: "a2", text: "Die Situation erinnert an die Rolle Suendenbock." }
+            ]
+          },
+          {
+            type: "single",
+            id: "animal-choice",
+            prompt: "Welches Tierbild passt in dieser Standard-Zuordnung am besten?",
+            options: [
+              { value: "sheep", label: "schwarzes Schaf" },
+              { value: "lion", label: "Loewe" },
+              { value: "cat", label: "Katze" }
+            ]
+          }
+        ],
+        validate(answers) {
+          const tf = answers["animal-tf"] || {};
+          return tf.a1 === "false" && tf.a2 === "true" && answers["animal-choice"] === "sheep";
+        },
+        success: "Stark kombiniert. Du hast Rolle und Tierbild zusammen richtig gelesen."
+      },
+      {
+        title: "Schloss 7: Der Spiegelraum",
+        subtitle: "Die letzte Tuer oeffnet sich nur, wenn du Schubladendenken erkennst.",
+        theme: {
+          sky: "linear-gradient(180deg, #f4eaff 0%, #9b8bc1 100%)",
+          wallTop: "#faf4ff",
+          wallBottom: "#dacdf1",
+          sideWall: "#cabbe8",
+          floorA: "#8f79b3",
+          floorB: "#6d598f",
+          board: "#43305f",
+          boardText: "#f6efff",
+          desk: "#5a4276",
+          deskTop: "#78589d",
+          door: "#7751a1",
+          doorDark: "#563879",
+          accent: "#9d4fe1",
+          accentDark: "#7037a7",
+          playerShirt: "#a357e2",
+          playerPants: "#36254f",
+          spotGlow: "rgba(205, 156, 255, 0.32)",
+          window: "#d4c1f6",
+          windowFrame: "#eee2ff"
+        },
+        posterTitle: "Spiegel",
+        posterText: "Nicht jedes erste Urteil ist fair.",
+        boardHeadline: "Tafel 7",
+        boardPreview: "Vorurteile und Schubladendenken sind das letzte Schloss.",
+        sceneTitle: "Die siebte Tafel",
+        sceneBody: [
+          "Jemand sagt: 'Weil er still ist, ist er sicher ein Aussenseiter.'",
+          "Solche Aussagen wirken eindeutig, aber oft weiss man ueber die Person noch viel zu wenig."
+        ],
+        questionLegend: "Klassifizieren: Ordne jede Aussage richtig ein.",
+        questions: [
+          {
+            type: "classify",
+            id: "labels",
+            rows: [
+              { key: "c1", prompt: "Weil er still ist, ist er sicher ein Aussenseiter." },
+              { key: "c2", prompt: "Sie widerspricht oft. Vielleicht ist sie eine Opponentin." },
+              { key: "c3", prompt: "Wer Witze macht, kann nie ernsthaft sein." }
+            ],
+            options: [
+              { value: "", label: "Bitte waehlen" },
+              { value: "fair", label: "faire Beobachtung" },
+              { value: "stereotype", label: "Vorurteil oder Schubladendenken" }
+            ]
+          }
+        ],
+        validate(answers) {
+          const set = answers.labels || {};
+          return set.c1 === "stereotype" && set.c2 === "fair" && set.c3 === "stereotype";
+        },
+        success: "Geschafft. Du erkennst jetzt auch, wann aus Beobachtung ein unfairer Stempel wird."
+      }
+    ];
+
+    const state = {
+      index: 0,
+      sceneRead: false,
+      unlocked: false,
+      solved: Array(stages.length).fill(false),
+      busy: false
+    };
+
+    const root = document.documentElement;
+    const room = document.getElementById("room");
+    const player = document.getElementById("player");
+    const boardButton = document.getElementById("board-button");
+    const boardHeadline = document.getElementById("board-headline");
+    const boardPreview = document.getElementById("board-preview");
+    const posterTitle = document.getElementById("poster-title");
+    const posterText = document.getElementById("poster-text");
+    const deskButton = document.getElementById("desk-button");
+    const deskSubtitle = document.getElementById("desk-subtitle");
+    const doorButton = document.getElementById("door-button");
+    const stageTitle = document.getElementById("stage-title");
+    const stageSubtitle = document.getElementById("stage-subtitle");
+    const roomBadge = document.getElementById("room-badge");
+    const statusText = document.getElementById("status-text");
+    const progress = document.getElementById("progress");
+
+    const startOverlay = document.getElementById("start-overlay");
+    const startButton = document.getElementById("start-button");
+    const sceneOverlay = document.getElementById("scene-overlay");
+    const sceneTitle = document.getElementById("scene-title");
+    const sceneBox = document.getElementById("scene-box");
+    const sceneDone = document.getElementById("scene-done");
+    const sceneClose = document.getElementById("scene-close");
+    const quizOverlay = document.getElementById("quiz-overlay");
+    const quizTitle = document.getElementById("quiz-title");
+    const quizLegend = document.getElementById("quiz-legend");
+    const quizForm = document.getElementById("quiz-form");
+    const quizClose = document.getElementById("quiz-close");
+    const feedback = document.getElementById("feedback");
+    const feedbackText = document.getElementById("feedback-text");
+    const travelOverlay = document.getElementById("travel-overlay");
+    const travelTitle = document.getElementById("travel-title");
+    const travelText = document.getElementById("travel-text");
+    const winOverlay = document.getElementById("win-overlay");
+    const restartButton = document.getElementById("restart-button");
+
+    function normalize(value) {
+      return (value || "")
+        .toLowerCase()
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z:]/g, "");
+    }
+
+    function setOverlay(el, show) {
+      el.classList.toggle("show", show);
+    }
+
+    function stage() {
+      return stages[state.index];
+    }
+
+    function applyTheme(theme) {
+      const map = {
+        sky: "--sky",
+        wallTop: "--wall-top",
+        wallBottom: "--wall-bottom",
+        sideWall: "--side-wall",
+        floorA: "--floor-a",
+        floorB: "--floor-b",
+        board: "--board",
+        boardText: "--board-text",
+        desk: "--desk",
+        deskTop: "--desk-top",
+        door: "--door",
+        doorDark: "--door-dark",
+        accent: "--accent",
+        accentDark: "--accent-dark",
+        playerShirt: "--player-shirt",
+        playerPants: "--player-pants",
+        spotGlow: "--spot-glow",
+        window: "--window",
+        windowFrame: "--window-frame"
+      };
+      Object.entries(map).forEach(([key, cssVar]) => {
+        root.style.setProperty(cssVar, theme[key]);
+      });
+    }
+
+    function buildProgress() {
+      progress.innerHTML = "";
+      stages.forEach((_, i) => {
+        const dot = document.createElement("div");
+        dot.className = "progress-dot" + (state.solved[i] ? " done" : "");
+        progress.appendChild(dot);
+      });
+    }
+
+    function movePlayer(target, callback) {
+      if (state.busy) return;
+      state.busy = true;
+      const positions = {
+        board: "21%",
+        desk: "46%",
+        door: "79%"
+      };
+      player.classList.add("walking");
+      player.style.setProperty("--player-x", positions[target]);
+      setTimeout(() => {
+        player.classList.remove("walking");
+        state.busy = false;
+        if (callback) callback();
+      }, 920);
+    }
+
+    function renderScene() {
+      const current = stage();
+      sceneTitle.textContent = current.sceneTitle;
+      sceneBox.innerHTML = current.sceneBody.map((p) => `<p>${p}</p>`).join("");
+    }
+
+    function renderQuiz() {
+      const current = stage();
+      quizTitle.textContent = current.title;
+      quizLegend.textContent = current.questionLegend;
+      feedback.className = "feedback";
+      feedbackText.textContent = "";
+
+      const chunks = [];
+      current.questions.forEach((question, index) => {
+        if (question.type === "single") {
+          const options = question.options.map((option, i) => `
+            <label class="option" for="${question.id}-${i}">
+              <input id="${question.id}-${i}" type="radio" name="${question.id}" value="${option.value}">
+              <span>${option.label}</span>
+            </label>
+          `).join("");
+
+          chunks.push(`
+            <div class="box question-group">
+              <p><strong>${index + 1}. ${question.prompt}</strong></p>
+              <div class="option-list">${options}</div>
+            </div>
+          `);
+        }
+
+        if (question.type === "fill") {
+          chunks.push(`
+            <div class="box question-group">
+              <p><strong>${index + 1}. ${question.prompt}</strong></p>
+              <div class="option-list">
+                <input class="fill-input" type="text" name="${question.id}" placeholder="${question.placeholder}">
+              </div>
+            </div>
+          `);
+        }
+
+        if (question.type === "truefalse") {
+          const rows = question.statements.map((statement) => `
+            <div class="statement-row">
+              <div>${statement.text}</div>
+              <label><input type="radio" name="${question.id}-${statement.key}" value="true"> Wahr</label>
+              <label><input type="radio" name="${question.id}-${statement.key}" value="false"> Falsch</label>
+            </div>
+          `).join("");
+          chunks.push(`
+            <div class="box question-group">
+              <p><strong>${index + 1}. Wahr oder falsch?</strong></p>
+              <div class="statement-grid">${rows}</div>
+            </div>
+          `);
+        }
+
+        if (question.type === "match" || question.type === "classify") {
+          const rows = question.rows.map((row) => {
+            const options = question.options.map((opt) => `<option value="${opt.value}">${opt.label}</option>`).join("");
+            return `
+              <div class="match-row">
+                <div>${row.prompt}</div>
+                <select class="select-input" name="${question.id}-${row.key}">
+                  ${options}
+                </select>
+              </div>
+            `;
+          }).join("");
+          chunks.push(`
+            <div class="box question-group">
+              <p><strong>${index + 1}. ${question.type === "match" ? "Zuordnen" : "Einordnen"}</strong></p>
+              <div class="match-grid">${rows}</div>
+            </div>
+          `);
+        }
+      });
+
+      chunks.push(`
+        <div class="button-row">
+          <button class="primary" type="submit">Antwort pruefen</button>
+          <button class="secondary" type="button" id="quiz-back">Zurueck in den Raum</button>
+        </div>
+      `);
+
+      quizForm.innerHTML = chunks.join("");
+      document.getElementById("quiz-back").addEventListener("click", () => setOverlay(quizOverlay, false));
+    }
+
+    function collectAnswers() {
+      const current = stage();
+      const answers = {};
+
+      current.questions.forEach((question) => {
+        if (question.type === "single") {
+          const checked = quizForm.querySelector(`input[name="${question.id}"]:checked`);
+          answers[question.id] = checked ? checked.value : null;
+        }
+
+        if (question.type === "fill") {
+          const input = quizForm.querySelector(`input[name="${question.id}"]`);
+          answers[question.id] = input ? input.value : "";
+        }
+
+        if (question.type === "truefalse") {
+          answers[question.id] = {};
+          question.statements.forEach((statement) => {
+            const checked = quizForm.querySelector(`input[name="${question.id}-${statement.key}"]:checked`);
+            answers[question.id][statement.key] = checked ? checked.value : null;
+          });
+        }
+
+        if (question.type === "match" || question.type === "classify") {
+          answers[question.id] = {};
+          question.rows.forEach((row) => {
+            const select = quizForm.querySelector(`select[name="${question.id}-${row.key}"]`);
+            answers[question.id][row.key] = select ? select.value : "";
+          });
+        }
+      });
+
+      return answers;
+    }
+
+    function showFeedback(text, good) {
+      feedback.className = "feedback show" + (good ? " good" : "");
+      feedbackText.textContent = text;
+    }
+
+    function renderStage() {
+      const current = stage();
+      applyTheme(current.theme);
+      boardHeadline.textContent = current.boardHeadline;
+      boardPreview.textContent = current.boardPreview;
+      posterTitle.textContent = current.posterTitle;
+      posterText.textContent = current.posterText;
+      stageTitle.textContent = current.title;
+      stageSubtitle.textContent = state.unlocked
+        ? "Die Tuer ist offen. Geh hindurch."
+        : state.sceneRead
+          ? current.subtitle + " Das Fragepult ist jetzt aktiv."
+          : current.subtitle;
+      roomBadge.textContent = `${state.index + 1} / ${stages.length}`;
+      statusText.textContent = state.unlocked
+        ? "Tuer offen."
+        : state.sceneRead
+          ? "Fragepult aktiv."
+          : `Schloss ${state.index + 1} wartet auf dich.`;
+      deskSubtitle.textContent = state.sceneRead ? "Jetzt Aufgabe loesen" : "Erst nach der Tafel aktiv";
+      doorButton.classList.toggle("locked", !state.unlocked);
+      if (!state.unlocked) {
+        doorButton.classList.remove("unlocked");
+      }
+      buildProgress();
+    }
+
+    function unlockDoor() {
+      state.unlocked = true;
+      state.solved[state.index] = true;
+      renderStage();
+      showFeedback(stage().success + " Die Tuer ist jetzt offen.", true);
+      setTimeout(() => {
+        setOverlay(quizOverlay, false);
+        doorButton.classList.add("unlocked");
+      }, 520);
+    }
+
+    function shake(el) {
+      el.classList.add("shake");
+      setTimeout(() => el.classList.remove("shake"), 520);
+    }
+
+    function resetForStage(index) {
+      state.index = index;
+      state.sceneRead = false;
+      state.unlocked = false;
+      player.classList.remove("entering-door", "walking");
+      player.style.setProperty("--player-x", "42%");
+      doorButton.classList.remove("unlocked", "locked");
+      renderStage();
+    }
+
+    function beginTravel() {
+      const nextIndex = state.index + 1;
+      const nextTitle = nextIndex < stages.length ? stages[nextIndex].title : "Freiheit";
+      room.classList.add("traveling");
+      player.classList.add("entering-door");
+      travelTitle.textContent = "Du gehst durch die Tuer ...";
+      travelText.textContent = nextIndex < stages.length
+        ? `${nextTitle} entsteht gerade.`
+        : "Der Ausgang liegt vor dir.";
+      setOverlay(travelOverlay, true);
+
+      setTimeout(() => {
+        if (nextIndex >= stages.length) {
+          room.classList.remove("traveling");
+          player.classList.remove("entering-door");
+          setOverlay(travelOverlay, false);
+          setOverlay(winOverlay, true);
+          return;
+        }
+
+        resetForStage(nextIndex);
+        room.classList.remove("traveling");
+        setTimeout(() => {
+          setOverlay(travelOverlay, false);
+        }, 220);
+      }, 1200);
+    }
+
+    function startGame() {
+      state.index = 0;
+      state.sceneRead = false;
+      state.unlocked = false;
+      state.solved = Array(stages.length).fill(false);
+      state.busy = false;
+      setOverlay(startOverlay, false);
+      setOverlay(sceneOverlay, false);
+      setOverlay(quizOverlay, false);
+      setOverlay(travelOverlay, false);
+      setOverlay(winOverlay, false);
+      renderStage();
+    }
+
+    boardButton.addEventListener("click", () => {
+      movePlayer("board", () => {
+        renderScene();
+        setOverlay(sceneOverlay, true);
+      });
+    });
+
+    sceneDone.addEventListener("click", () => {
+      state.sceneRead = true;
+      setOverlay(sceneOverlay, false);
+      renderStage();
+    });
+
+    sceneClose.addEventListener("click", () => setOverlay(sceneOverlay, false));
+
+    deskButton.addEventListener("click", () => {
+      movePlayer("desk", () => {
+        if (!state.sceneRead) {
+          statusText.textContent = "Lies zuerst die Situation an der Tafel.";
+          shake(deskButton);
+          return;
+        }
+        renderQuiz();
+        setOverlay(quizOverlay, true);
+      });
+    });
+
+    quizClose.addEventListener("click", () => setOverlay(quizOverlay, false));
+
+    quizForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const answers = collectAnswers();
+      if (stage().validate(answers)) {
+        unlockDoor();
+      } else {
+        showFeedback("Noch nicht ganz. Lies die Situation noch einmal genau und versuche es erneut.", false);
+      }
+    });
+
+    doorButton.addEventListener("click", () => {
+      movePlayer("door", () => {
+        if (!state.unlocked) {
+          statusText.textContent = state.sceneRead
+            ? "Die Tuer bleibt zu. Erst die richtige Antwort oeffnet sie."
+            : "Die Tuer bleibt zu. Lies zuerst die Tafel.";
+          shake(doorButton);
+          return;
+        }
+        beginTravel();
+      });
+    });
+
+    startButton.addEventListener("click", startGame);
+    restartButton.addEventListener("click", startGame);
+
+    room.addEventListener("mousemove", (event) => {
+      const bounds = room.getBoundingClientRect();
+      const x = (event.clientX - bounds.left) / bounds.width;
+      const tilt = ((x - 0.5) * 7).toFixed(2);
+      room.style.setProperty("--tilt", `${tilt}deg`);
+    });
+
+    room.addEventListener("mouseleave", () => {
+      room.style.setProperty("--tilt", "-4deg");
+    });
+
+    buildProgress();
+  </script>
+</body>
+</html>
